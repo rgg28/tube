@@ -1,4 +1,4 @@
-name: Compilar Tube APK Firmado
+name: Compilar Tube APK Firmado Profesional
 
 on:
   push:
@@ -19,11 +19,6 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Inyectar Manifiesto Perfecto y Validado
-      run: |
-        mkdir -p app/src/main
-        echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://google.com"><uses-permission android:name="android.permission.INTERNET" /><application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="Tube" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar"><activity android:name="com.tuservidor.tube.MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
-
     - name: Crear archivo gradlew y forzar Gradle 8.7
       run: |
         gradle wrapper --gradle-version 8.7 --distribution-type bin
@@ -34,15 +29,15 @@ jobs:
     - name: Compilar APK en modo Release Puro
       run: ./gradlew assembleRelease --no-daemon
 
-    - name: Generar clave y firmar el APK en la nube
+    - name: Firmar el APK usando tus secretos de GitHub
       id: sign_app
       uses: r0adkll/sign-android-release@v1
       with:
         releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY || 'MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBANMxMzU3OTI0NgIDAQAB' }}
-        alias: 'tube_key'
-        keyStorePassword: 'tubepassword123'
-        keyPassword: 'tubepassword123'
+        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+        alias: ${{ secrets.ALIAS }}
+        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
 
     - name: Subir tu app Tube lista para instalar
       uses: actions/upload-artifact@v4
