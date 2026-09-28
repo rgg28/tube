@@ -15,6 +15,16 @@ android {
         versionName "1.0"
     }
 
+    // FUERZA BRUTA: Le indicamos a Gradle la ruta exacta de la estructura limpia
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            java.srcDirs = ['src/main/java']
+            res.srcDirs = ['src/main/res']
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -31,7 +41,6 @@ android {
 }
 
 dependencies {
-    // Usamos las dependencias mínimas puras para evitar fusiones de manifiestos rotas
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.activity:activity-ktx:1.9.0'
 }
