@@ -19,6 +19,33 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
+    - name: Fabricar Manifiesto Nativo Seguro
+      run: |
+        # 1. Creamos la estructura de carpetas necesarias en el disco del servidor
+        mkdir -p app/src/main
+        # 2. Escribimos el archivo XML limpio usando texto plano puro sin sangrias
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://google.com">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Tube"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+        <activity
+            android:name="com.tuservidor.tube.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
+
     - name: Crear archivo gradlew y forzar Gradle 8.7
       run: |
         gradle wrapper --gradle-version 8.7 --distribution-type bin
