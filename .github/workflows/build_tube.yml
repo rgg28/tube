@@ -20,12 +20,11 @@ jobs:
         java-version: '17'
         cache: 'gradle'
 
-    - name: Borrado total de cache a nivel de sistema
+    - name: Borrado total de cache y forzar Gradle 8.7
       run: |
         rm -rf .gradle app/.gradle build app/build
-        if [ ! -f gradlew ]; then
-          gradle wrapper --gradle-version 8.2 --distribution-type bin
-        fi
+        # Forzamos la descarga del motor Gradle 8.7 para que sea compatible con el conector de Android
+        gradle wrapper --gradle-version 8.7 --distribution-type bin
         chmod +x ./gradlew
 
     - name: Compilar APK en modo Release Puro
