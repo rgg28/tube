@@ -3,7 +3,7 @@ name: Compilar Tube APK Firmado
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Esto te activa el boton manual
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -20,14 +20,15 @@ jobs:
         java-version: '17'
         cache: 'gradle'
 
-    - name: Crear archivos de inicio de Gradle si no existen
+    - name: Forzar limpieza absoluta y preparar Gradle
       run: |
         if [ ! -f gradlew ]; then
           gradle wrapper --gradle-version 8.2 --distribution-type bin
         fi
         chmod +x ./gradlew
+        ./gradlew clean --no-daemon
 
-    - name: Compilar APK en modo Release
+    - name: Compilar APK en modo Release Limpio
       run: ./gradlew assembleRelease --no-daemon
 
     - name: Generar clave y firmar el APK en la nube
