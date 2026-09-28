@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Descargar el codigo fuente
+    - name: Descargar el codigo fuente limpio
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 1 # Fuerza a descargar solo los cambios de hoy ignorando la cache del historial
 
     - name: Configurar Entorno Java JDK 17
       uses: actions/setup-java@v4
@@ -19,11 +21,12 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Saneamiento Completo de Gradle
+    - name: Destruir Cache Residual de Linux
       run: |
+        # Borramos todas las carpetas temporales ocultas del servidor
+        rm -rf .gradle app/.gradle build app/build
         gradle wrapper --gradle-version 8.7 --distribution-type bin
         chmod +x ./gradlew
-        rm -rf .gradle app/.gradle build app/build
         ./gradlew clean --no-daemon
 
     - name: Compilar APK en modo Release Puro
