@@ -20,7 +20,7 @@ jobs:
         java-version: '17'
         cache: 'gradle'
 
-    - name: Inyectar Manifiesto Puro en la Nube
+    - name: Inyectar Manifiesto Definitivo en la Nube
       run: |
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
