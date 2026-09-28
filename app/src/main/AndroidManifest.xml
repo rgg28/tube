@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://google.com"
-    package="com.tuservidor.tube">
+<manifest xmlns:android="http://google.com">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
