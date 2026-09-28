@@ -23,34 +23,31 @@ jobs:
       run: |
         mkdir -p app/src/main
         cat << 'EOF' > app/src/main/AndroidManifest.xml
-        <?xml version="1.0" encoding="utf-8"?>
-        <manifest xmlns:android="http://google.com">
-            <uses-permission android:name="android.permission.INTERNET" />
-            <application
-                android:allowBackup="true"
-                android:icon="@mipmap/ic_launcher"
-                android:label="Tube"
-                android:supportsRtl="true"
-                android:theme="@style/Theme.AppCompat.NoActionBar">
-                <activity
-                    android:name="com.tuservidor.tube.MainActivity"
-                    android:exported="true">
-                    <intent-filter>
-                        <action android:name="android.intent.action.MAIN" />
-                        <category android:name="android.intent.category.LAUNCHER" />
-                    </intent-filter>
-                </activity>
-            </application>
-        </manifest>
-        EOF
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://google.com">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Tube"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+        <activity
+            android:name="com.tuservidor.tube.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
 
     - name: Crear archivo gradlew y forzar Gradle 8.7
       run: |
-        # 1. Generamos el archivo ejecutable que le falta al repositorio
         gradle wrapper --gradle-version 8.7 --distribution-type bin
-        # 2. Le otorgamos los permisos de ejecucion necesarios en Linux
         chmod +x ./gradlew
-        # 3. Limpiamos cualquier rastro residual
         rm -rf .gradle app/.gradle build app/build
         ./gradlew clean --no-daemon
 
