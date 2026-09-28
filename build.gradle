@@ -3,9 +3,10 @@ buildscript {
         google()
         mavenCentral()
     }
-    ext.kotlin_version = '1.9.22'
+    ext.kotlin_version = '1.9.24'
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.2'
+        // Actualizamos al conector moderno 8.4.0 compatible con fusiones limpias
+        classpath 'com.android.tools.build:gradle:8.4.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
