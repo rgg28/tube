@@ -20,15 +20,15 @@ jobs:
         java-version: '17'
         cache: 'gradle'
 
-    - name: Forzar limpieza absoluta y preparar Gradle
+    - name: Borrado total de cache a nivel de sistema
       run: |
+        rm -rf .gradle app/.gradle build app/build
         if [ ! -f gradlew ]; then
           gradle wrapper --gradle-version 8.2 --distribution-type bin
         fi
         chmod +x ./gradlew
-        ./gradlew clean --no-daemon
 
-    - name: Compilar APK en modo Release Limpio
+    - name: Compilar APK en modo Release Puro
       run: ./gradlew assembleRelease --no-daemon
 
     - name: Generar clave y firmar el APK en la nube
