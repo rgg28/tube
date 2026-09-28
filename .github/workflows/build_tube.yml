@@ -1,9 +1,10 @@
-```yaml
-name: Compilar Tube APK Firmado Profesional
+name: Compilar Tube APK Firmado
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -11,47 +12,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Descargar el codigo fuente limpio
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
 
-    - name: Configurar Entorno Java JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-    - name: Instalar Android Build Tools 29.0.3
-      run: |
-        yes | sdkmanager --licenses || true
-        sdkmanager "platform-tools" "build-tools;29.0.3"
+      - name: Configurar Gradle 8.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.6'
 
-    - name: Preparar Gradle 8.7
-      run: |
-        rm -rf .gradle app/.gradle build app/build
-        gradle wrapper --gradle-version 8.7 --distribution-type bin
-        chmod +x ./gradlew
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
 
-    - name: Limpiar proyecto
-      run: ./gradlew clean --no-daemon
+      - name: Instalar SDK Android 34
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-34"
+          sdkmanager "build-tools;34.0.0"
 
-    - name: Compilar APK en modo Release Puro
-      run: ./gradlew assembleRelease --no-daemon
+      - name: Crear Gradle Wrapper 8.6
+        run: |
+          gradle wrapper --gradle-version 8.6 --distribution-type bin
+          chmod +x ./gradlew
 
-    - name: Firmar el APK usando tus secretos de GitHub
-      id: sign_app
-      uses: r0adkll/sign-android-release@v1
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
+      - name: Verificar Gradle
+        run: |
+          java -version
+          ./gradlew --version
 
-    - name: Subir tu app Tube lista para instalar
-      uses: actions/upload-artifact@v4
-      with:
-        name: Tube-Instalable-Sin-Anuncios
-        path: ${{ steps.sign_app.outputs.signedReleaseFile }}
-```
+      - name: Limpiar proyecto
+        run: |
+          ./gradlew clean --no-daemon
+
+      - name: Compilar APK Release
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Mostrar APK generado
+        run: |
+          echo "===== APK GENERADO ====="
+          find app/build/outputs/apk/release -type f -name "*.apk" -print
+
+      - name: Firmar APK
+        id: sign_app
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Subir APK firmado
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tube-Instalable-Sin-Anuncios
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          if-no-files-found: error
