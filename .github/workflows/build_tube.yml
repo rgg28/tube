@@ -44,11 +44,15 @@ jobs:
         </manifest>
         EOF
 
-    - name: Borrado total de cache y forzar Gradle 8.7
+    - name: Crear archivo gradlew y forzar Gradle 8.7
       run: |
-        rm -rf .gradle app/.gradle build app/build
+        # 1. Generamos el archivo ejecutable que le falta al repositorio
         gradle wrapper --gradle-version 8.7 --distribution-type bin
+        # 2. Le otorgamos los permisos de ejecucion necesarios en Linux
         chmod +x ./gradlew
+        # 3. Limpiamos cualquier rastro residual
+        rm -rf .gradle app/.gradle build app/build
+        ./gradlew clean --no-daemon
 
     - name: Compilar APK en modo Release Puro
       run: ./gradlew assembleRelease --no-daemon
