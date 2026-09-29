@@ -3,8 +3,8 @@ buildscript {
         google()
         mavenCentral()
     }
+
     dependencies {
-        // Dejamos únicamente el conector oficial de Android Studio
         classpath 'com.android.tools.build:gradle:8.4.0'
     }
 }
