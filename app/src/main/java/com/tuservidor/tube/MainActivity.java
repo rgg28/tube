@@ -1,4 +1,3 @@
-```java
 package com.tuservidor.tube;
 
 import android.annotation.SuppressLint;
@@ -361,4 +360,3 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 }
-```
