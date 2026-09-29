@@ -13,10 +13,28 @@
         <activity
             android:name="com.tuservidor.tube.MainActivity"
             android:exported="true">
+
+            <!-- Lanzador normal de la aplicación -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- ===================================================== -->
+            <!-- DEEP LINK PARA RETORNO DEL LOGIN -->
+            <!-- ===================================================== -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="com.tuservidor.tube"
+                    android:host="oauth2redirect" />
+
+            </intent-filter>
+
         </activity>
 
     </application>
