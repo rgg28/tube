@@ -43,8 +43,8 @@ public class MainActivity extends AppCompatActivity {
                 String url = request.getUrl().toString();
                 
                 // Si la URL contiene el subdominio de cuentas de Google, la desviamos
-                if (url.contains("://google.com")) {
-                    CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+                if (url.contains("accounts.google.com") || url.contains("passiveSignIn")) {
+                 CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
                     CustomTabsIntent customTabsIntent = builder.build();
                     customTabsIntent.launchUrl(MainActivity.this, Uri.parse(url));
                     return true; // Retornar true evita que el WebView cargue la página internamente
