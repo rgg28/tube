@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+ext {
+    geckoviewChannel = 'stable'
+    geckoviewVersion = '156.0.20260921121718'
+}
+
 android {
     namespace 'com.tuservidor.tube'
     compileSdk 35
@@ -22,5 +27,5 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'org.mozilla.geckoview:geckoview:159.0.20260925214453'
+    implementation "org.mozilla.geckoview:geckoview-${geckoviewChannel}:${geckoviewVersion}"
 }
