@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -20,28 +20,90 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
+      - name: Configure Android SDK
+        shell: bash
         run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
+          set -e
 
-      - name: Verify Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "=============================================="
+          echo "ANDROID SDK"
+          echo "=============================================="
 
-          sdkmanager --list_installed
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "ANDROID_HOME=$ANDROID_HOME"
+          elif [ -d "$ANDROID_SDK_ROOT" ]; then
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          else
+            echo "Android SDK environment variable not found."
+            exit 1
+          fi
+
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          echo "Using SDK: $SDK"
+
+          echo "sdkmanager:"
+          find "$SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null || true
 
           echo ""
-          echo "Build tools:"
-          ls -la "$ANDROID_SDK_ROOT/build-tools/35.0.0"
+          echo "Installed platforms:"
+          ls -la "$SDK/platforms" 2>/dev/null || true
 
-      - name: Verify project files
+          echo ""
+          echo "Installed build tools:"
+          ls -la "$SDK/build-tools" 2>/dev/null || true
+
+      - name: Install required Android packages
+        shell: bash
         run: |
+          set -e
+
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          SDKMANAGER=$(find "$SDK/cmdline-tools" \
+            -name sdkmanager \
+            -type f \
+            2>/dev/null | sort -V | tail -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not found."
+            exit 1
+          fi
+
+          echo "Using sdkmanager:"
+          echo "$SDKMANAGER"
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          set -e
+
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          echo "=============================================="
+          echo "VERIFY ANDROID SDK"
+          echo "=============================================="
+
+          test -d "$SDK/platforms/android-35"
+          test -d "$SDK/build-tools/35.0.0"
+
+          test -f "$SDK/build-tools/35.0.0/apksigner"
+          test -f "$SDK/build-tools/35.0.0/aapt2"
+
+          echo "Android SDK OK."
+
+      - name: Verify project structure
+        shell: bash
+        run: |
+          set -e
+
           echo "=============================================="
           echo "PROJECT STRUCTURE"
           echo "=============================================="
@@ -50,9 +112,14 @@ jobs:
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/tuservidor/tube/MainActivity.java
 
-          echo "All required files found."
+          echo ""
+          echo "Required files:"
+          echo "OK: app/build.gradle"
+          echo "OK: app/src/main/AndroidManifest.xml"
+          echo "OK: MainActivity.java"
 
       - name: Create settings.gradle
+        shell: bash
         run: |
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -65,6 +132,7 @@ jobs:
 
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+
               repositories {
                   google()
                   mavenCentral()
@@ -72,10 +140,12 @@ jobs:
           }
 
           rootProject.name = "Tube"
+
           include(":app")
           EOF
 
       - name: Create root build.gradle
+        shell: bash
         run: |
           cat > build.gradle <<'EOF'
           plugins {
@@ -83,8 +153,11 @@ jobs:
           }
           EOF
 
-      - name: Generate application icon
+      - name: Generate YouTube application icon
+        shell: bash
         run: |
+          set -e
+
           mkdir -p app/src/main/res/drawable
 
           python3 - <<'PY'
@@ -108,7 +181,7 @@ jobs:
               row = bytearray()
 
               for x in range(W):
-                  # Rounded red rectangle.
+
                   left = 55
                   right = 457
                   top = 105
@@ -124,37 +197,34 @@ jobs:
                       inside = left <= x <= right
 
                   else:
-                      corners = [
+                      corners = (
                           (left + radius, top + radius),
                           (right - radius, top + radius),
                           (left + radius, bottom - radius),
-                          (right - radius, bottom - radius)
-                      ]
+                          (right - radius, bottom - radius),
+                      )
 
                       for cx, cy in corners:
                           if (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2:
                               inside = True
                               break
 
-                  r = 255 if inside else 0
-                  g = 0
-                  b = 0
-                  a = 255 if inside else 0
+                  if inside:
+                      r, g, b, a = 255, 0, 0, 255
+                  else:
+                      r, g, b, a = 0, 0, 0, 0
 
-                  # White play triangle.
+                  # Play button.
                   if inside:
                       if (
-                          x >= 215
-                          and x <= 330
-                          and abs(y - 256) <= min(
+                          215 <= x <= 330
+                          and abs(y - 256)
+                          <= min(
                               (x - 215) * 0.58,
                               (330 - x) * 0.58
                           )
                       ):
-                          r = 255
-                          g = 255
-                          b = 255
-                          a = 255
+                          r, g, b, a = 255, 255, 255, 255
 
                   row.extend((r, g, b, a))
 
@@ -166,9 +236,21 @@ jobs:
               b"\x89PNG\r\n\x1a\n"
               + chunk(
                   b"IHDR",
-                  struct.pack(">IIBBBBB", W, H, 8, 6, 0, 0, 0)
+                  struct.pack(
+                      ">IIBBBBB",
+                      W,
+                      H,
+                      8,
+                      6,
+                      0,
+                      0,
+                      0
+                  )
               )
-              + chunk(b"IDAT", zlib.compress(raw, 9))
+              + chunk(
+                  b"IDAT",
+                  zlib.compress(raw, 9)
+              )
               + chunk(b"IEND", b"")
           )
 
@@ -182,19 +264,32 @@ jobs:
           file app/src/main/res/drawable/ic_youtube.png
 
       - name: Configure application icon
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           path = Path("app/src/main/AndroidManifest.xml")
+
           text = path.read_text()
 
-          if 'android:icon=' not in text:
-              text = text.replace(
-                  '<application',
-                  '<application\n        android:icon="@drawable/ic_youtube"\n        android:roundIcon="@drawable/ic_youtube"',
-                  1
-              )
+          text = text.replace(
+              'android:icon="@drawable/ic_youtube"',
+              ''
+          )
+
+          text = text.replace(
+              'android:roundIcon="@drawable/ic_youtube"',
+              ''
+          )
+
+          text = text.replace(
+              '<application',
+              '''<application
+                  android:icon="@drawable/ic_youtube"
+                  android:roundIcon="@drawable/ic_youtube"''',
+              1
+          )
 
           path.write_text(text)
           PY
@@ -202,16 +297,22 @@ jobs:
           grep -n "application" app/src/main/AndroidManifest.xml
 
       - name: Install Gradle
+        shell: bash
         run: |
+          set -e
+
           sudo apt-get update
           sudo apt-get install -y gradle
 
-      - name: Generate temporary signing key
+      - name: Generate release signing key
+        shell: bash
         env:
           KEYSTORE_PASSWORD: tube_release_password
           KEY_PASSWORD: tube_release_password
           KEY_ALIAS: tube
         run: |
+          set -e
+
           mkdir -p "$RUNNER_TEMP/keystore"
 
           keytool \
@@ -230,36 +331,58 @@ jobs:
           echo "KEYSTORE_FILE=$RUNNER_TEMP/keystore/tube-release.jks" >> "$GITHUB_ENV"
 
       - name: Create Gradle wrapper
+        shell: bash
         run: |
+          set -e
+
           gradle wrapper --gradle-version 8.9
 
-      - name: Make Gradle executable
-        run: chmod +x gradlew
+          chmod +x gradlew
 
-      - name: Build Release
+      - name: Verify Gradle
+        shell: bash
+        run: |
+          ./gradlew --version
+
+      - name: Build Release APK
+        shell: bash
         env:
           KEYSTORE_PASSWORD: tube_release_password
           KEY_PASSWORD: tube_release_password
           KEY_ALIAS: tube
         run: |
-          ./gradlew clean assembleRelease \
+          set -e
+
+          ./gradlew \
+            clean \
+            assembleRelease \
             --stacktrace \
             --no-daemon
 
       - name: Verify APK
+        shell: bash
         run: |
+          set -e
+
           echo "=============================================="
           echo "RELEASE APK"
           echo "=============================================="
 
-          APK=$(find app/build/outputs -type f -name "*.apk" | head -n 1)
+          APK=$(find app/build/outputs \
+            -type f \
+            -name "*.apk" \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-              echo "ERROR: APK was not generated."
+              echo "ERROR: Release APK was not generated."
               exit 1
           fi
 
-          echo "APK: $APK"
+          echo "APK:"
+          echo "$APK"
+
+          echo ""
+          echo "Size:"
           ls -lh "$APK"
 
           echo ""
@@ -267,15 +390,31 @@ jobs:
           echo "VERIFYING SIGNATURE"
           echo "=============================================="
 
-          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify \
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          "$SDK/build-tools/35.0.0/apksigner" \
+            verify \
             --verbose \
             "$APK"
 
-      - name: Rename APK
+          echo ""
+          echo "APK SIGNATURE OK."
+
+      - name: Prepare final APK
+        shell: bash
         run: |
-          APK=$(find app/build/outputs -type f -name "*.apk" | head -n 1)
+          set -e
+
+          APK=$(find app/build/outputs \
+            -type f \
+            -name "*.apk" \
+            | head -n 1)
 
           cp "$APK" Tube-release.apk
+
+          echo "=============================================="
+          echo "FINAL APK"
+          echo "=============================================="
 
           ls -lh Tube-release.apk
 
