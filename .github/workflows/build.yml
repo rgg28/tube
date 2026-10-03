@@ -54,13 +54,8 @@ jobs:
           fi
 
           echo "SDK=$SDK"
-
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-
-          echo ""
-          echo "SDK directories:"
-          ls -la "$SDK"
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
 
           echo ""
           echo "Command line tools:"
@@ -69,9 +64,17 @@ jobs:
             -type f \
             2>/dev/null || true
 
+          echo ""
+          echo "Installed platforms:"
+          ls -la "$SDK/platforms" 2>/dev/null || true
+
+          echo ""
+          echo "Installed build tools:"
+          ls -la "$SDK/build-tools" 2>/dev/null || true
+
 
       # ============================================================
-      # INSTALL ANDROID PACKAGES
+      # ANDROID SDK PACKAGES
       # ============================================================
 
       - name: Install Android SDK packages
@@ -93,17 +96,28 @@ jobs:
               exit 1
           fi
 
-          echo "Using:"
+          echo "Using sdkmanager:"
           echo "$SDKMANAGER"
 
-          chmod +x "$SDKMANAGER"
+          echo ""
+          echo "sdkmanager permissions:"
+          ls -l "$SDKMANAGER"
+
+          echo ""
+          echo "Accepting Android licenses..."
 
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          echo ""
+          echo "Installing required Android packages..."
 
           "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
+
+          echo ""
+          echo "Android packages installed."
 
 
       # ============================================================
@@ -151,7 +165,7 @@ jobs:
           echo ""
           echo "Required files:"
           echo "OK: app/build.gradle"
-          echo "OK: AndroidManifest.xml"
+          echo "OK: app/src/main/AndroidManifest.xml"
           echo "OK: MainActivity.java"
 
 
@@ -185,6 +199,8 @@ jobs:
           include(":app")
           EOF
 
+          echo "settings.gradle created."
+
 
       # ============================================================
       # ROOT BUILD.GRADLE
@@ -198,6 +214,8 @@ jobs:
               id 'com.android.application' version '8.7.3' apply false
           }
           EOF
+
+          echo "Root build.gradle created."
 
 
       # ============================================================
@@ -320,9 +338,11 @@ jobs:
 
           file app/src/main/res/drawable/ic_youtube.png
 
+          echo "YouTube icon generated."
+
 
       # ============================================================
-      # CONFIGURE ICON
+      # CONFIGURE APPLICATION ICON
       # ============================================================
 
       - name: Configure application icon
@@ -360,14 +380,16 @@ jobs:
           path.write_text(text)
           PY
 
-          echo ""
-          echo "Manifest:"
+          echo "=============================================="
+          echo "APPLICATION ICON"
+          echo "=============================================="
+
           grep -n "application" \
             app/src/main/AndroidManifest.xml
 
 
       # ============================================================
-      # DOWNLOAD GRADLE 8.9
+      # INSTALL GRADLE 8.9
       # ============================================================
 
       - name: Install Gradle 8.9
@@ -376,7 +398,7 @@ jobs:
           set -e
 
           echo "=============================================="
-          echo "GRADLE 8.9"
+          echo "INSTALLING GRADLE 8.9"
           echo "=============================================="
 
           GRADLE_VERSION="8.9"
@@ -412,11 +434,13 @@ jobs:
         run: |
           set -e
 
+          echo "=============================================="
+          echo "CREATING GRADLE WRAPPER"
+          echo "=============================================="
+
           gradle wrapper \
             --gradle-version 8.9 \
             --distribution-type bin
-
-          chmod +x gradlew
 
           echo ""
           echo "Gradle wrapper created."
@@ -437,6 +461,10 @@ jobs:
           KEY_ALIAS: tube
         run: |
           set -e
+
+          echo "=============================================="
+          echo "GENERATING RELEASE KEYSTORE"
+          echo "=============================================="
 
           mkdir -p "$RUNNER_TEMP/keystore"
 
@@ -459,7 +487,7 @@ jobs:
 
 
       # ============================================================
-      # CONFIGURE SIGNING
+      # CONFIGURE RELEASE SIGNING
       # ============================================================
 
       - name: Configure release signing
@@ -475,12 +503,9 @@ jobs:
 
           if "signingConfigs" not in text:
 
-              marker = """
-              buildTypes {
-              """
+              marker = "    buildTypes {"
 
-              signing = """
-              signingConfigs {
+              signing = """    signingConfigs {
                   release {
                       storeFile file(System.getenv("KEYSTORE_FILE"))
                       storePassword System.getenv("KEYSTORE_PASSWORD")
@@ -489,7 +514,12 @@ jobs:
                   }
               }
 
-              """
+          """
+
+              if marker not in text:
+                  raise SystemExit(
+                      "ERROR: buildTypes block not found."
+                  )
 
               text = text.replace(
                   marker,
@@ -499,9 +529,18 @@ jobs:
 
           if "signingConfig signingConfigs.release" not in text:
 
+              marker = "        release {"
+
+              if marker not in text:
+                  raise SystemExit(
+                      "ERROR: release buildType not found."
+                  )
+
               text = text.replace(
-                  "release {",
-                  "release {\n            signingConfig signingConfigs.release",
+                  marker,
+                  marker + """
+                      signingConfig signingConfigs.release
+                  """,
                   1
               )
 
@@ -524,11 +563,15 @@ jobs:
         run: |
           set -e
 
+          echo "=============================================="
+          echo "GRADLE VERSION"
+          echo "=============================================="
+
           ./gradlew --version
 
 
       # ============================================================
-      # BUILD RELEASE
+      # BUILD RELEASE APK
       # ============================================================
 
       - name: Build Release APK
@@ -598,7 +641,7 @@ jobs:
 
 
       # ============================================================
-      # FINAL APK
+      # PREPARE FINAL APK
       # ============================================================
 
       - name: Prepare final APK
@@ -611,6 +654,11 @@ jobs:
             -name "*.apk" \
             | head -n 1)
 
+          if [ -z "$APK" ]; then
+              echo "ERROR: APK not found."
+              exit 1
+          fi
+
           cp "$APK" Tube-release.apk
 
           echo "=============================================="
@@ -621,7 +669,7 @@ jobs:
 
 
       # ============================================================
-      # ARTIFACT
+      # UPLOAD APK
       # ============================================================
 
       - name: Upload Release APK
