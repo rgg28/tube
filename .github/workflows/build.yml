@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -23,26 +23,34 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
 
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+      - name: Verify Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      - name: Verify project
+          sdkmanager --list_installed
+
+          echo ""
+          echo "Build tools:"
+          ls -la "$ANDROID_SDK_ROOT/build-tools/35.0.0"
+
+      - name: Verify project files
         run: |
           echo "=============================================="
-          echo "PROJECT"
+          echo "PROJECT STRUCTURE"
           echo "=============================================="
 
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/tuservidor/tube/MainActivity.java
 
-          echo "Project structure OK."
+          echo "All required files found."
 
       - name: Create settings.gradle
         run: |
@@ -75,7 +83,7 @@ jobs:
           }
           EOF
 
-      - name: Generate YouTube icon
+      - name: Generate application icon
         run: |
           mkdir -p app/src/main/res/drawable
 
@@ -86,7 +94,7 @@ jobs:
           W = 512
           H = 512
 
-          def png_chunk(kind, data):
+          def chunk(kind, data):
               return (
                   struct.pack(">I", len(data))
                   + kind
@@ -94,53 +102,74 @@ jobs:
                   + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
               )
 
-          pixels = []
+          rows = []
 
           for y in range(H):
               row = bytearray()
 
               for x in range(W):
-                  # Rounded-ish red YouTube style background.
-                  dx = abs(x - W / 2)
-                  dy = abs(y - H / 2)
+                  # Rounded red rectangle.
+                  left = 55
+                  right = 457
+                  top = 105
+                  bottom = 407
+                  radius = 85
 
-                  radius = 125
-                  inside = (
-                      (dx <= W / 2 - 35 and dy <= H / 2)
-                      or
-                      (dx <= W / 2 and dy <= H / 2 - 35)
-                  )
+                  inside = False
 
-                  if inside:
-                      r, g, b, a = 255, 0, 0, 255
+                  if left + radius <= x <= right - radius:
+                      inside = top <= y <= bottom
+
+                  elif top + radius <= y <= bottom - radius:
+                      inside = left <= x <= right
+
                   else:
-                      r, g, b, a = 0, 0, 0, 0
+                      corners = [
+                          (left + radius, top + radius),
+                          (right - radius, top + radius),
+                          (left + radius, bottom - radius),
+                          (right - radius, bottom - radius)
+                      ]
+
+                      for cx, cy in corners:
+                          if (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2:
+                              inside = True
+                              break
+
+                  r = 255 if inside else 0
+                  g = 0
+                  b = 0
+                  a = 255 if inside else 0
 
                   # White play triangle.
-                  if (
-                      x >= 205
-                      and x <= 325
-                      and
-                      abs(y - 256) <= (x - 205) * 0.62
-                      and
-                      abs(y - 256) <= (325 - x) * 0.62
-                  ):
-                      r, g, b, a = 255, 255, 255, 255
+                  if inside:
+                      if (
+                          x >= 215
+                          and x <= 330
+                          and abs(y - 256) <= min(
+                              (x - 215) * 0.58,
+                              (330 - x) * 0.58
+                          )
+                      ):
+                          r = 255
+                          g = 255
+                          b = 255
+                          a = 255
 
                   row.extend((r, g, b, a))
 
-              pixels.append(b"\x00" + bytes(row))
+              rows.append(b"\x00" + bytes(row))
 
-          raw = b"".join(pixels)
+          raw = b"".join(rows)
 
           png = (
               b"\x89PNG\r\n\x1a\n"
-              + png_chunk(
+              + chunk(
                   b"IHDR",
                   struct.pack(">IIBBBBB", W, H, 8, 6, 0, 0, 0)
               )
-              + png_chunk(b"IDAT", zlib.compress(raw, 9))
-              + png_chunk(b"IEND", b"")
+              + chunk(b"IDAT", zlib.compress(raw, 9))
+              + chunk(b"IEND", b"")
           )
 
           with open(
@@ -150,70 +179,34 @@ jobs:
               f.write(png)
           PY
 
-          echo "Icon generated."
-
-      - name: Configure Android application
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("app/build.gradle")
-
-          text = p.read_text()
-
-          if "signingConfigs" not in text:
-              text = text.replace(
-                  "buildTypes {",
-                  """signingConfigs {
-              release {
-                  storeFile file(System.getenv("KEYSTORE_FILE"))
-                  storePassword System.getenv("KEYSTORE_PASSWORD")
-                  keyAlias System.getenv("KEY_ALIAS")
-                  keyPassword System.getenv("KEY_PASSWORD")
-              }
-          }
-
-          buildTypes {"""
-              )
-
-          text = text.replace(
-              """release {
-              minifyEnabled false
-              shrinkResources false
-          }""",
-              """release {
-              minifyEnabled false
-              shrinkResources false
-              signingConfig signingConfigs.release
-          }"""
-          )
-
-          p.write_text(text)
-          PY
+          file app/src/main/res/drawable/ic_youtube.png
 
       - name: Configure application icon
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path("app/src/main/AndroidManifest.xml")
-          text = p.read_text()
+          path = Path("app/src/main/AndroidManifest.xml")
+          text = path.read_text()
 
-          text = text.replace(
-              '<application',
-              '<application android:icon="@drawable/ic_youtube" android:roundIcon="@drawable/ic_youtube"',
-              1
-          )
+          if 'android:icon=' not in text:
+              text = text.replace(
+                  '<application',
+                  '<application\n        android:icon="@drawable/ic_youtube"\n        android:roundIcon="@drawable/ic_youtube"',
+                  1
+              )
 
-          p.write_text(text)
+          path.write_text(text)
           PY
+
+          grep -n "application" app/src/main/AndroidManifest.xml
 
       - name: Install Gradle
         run: |
           sudo apt-get update
           sudo apt-get install -y gradle
 
-      - name: Generate release keystore
+      - name: Generate temporary signing key
         env:
           KEYSTORE_PASSWORD: tube_release_password
           KEY_PASSWORD: tube_release_password
@@ -243,7 +236,7 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x gradlew
 
-      - name: Build signed Release APK
+      - name: Build Release
         env:
           KEYSTORE_PASSWORD: tube_release_password
           KEY_PASSWORD: tube_release_password
@@ -253,34 +246,28 @@ jobs:
             --stacktrace \
             --no-daemon
 
-      - name: Verify Release APK
+      - name: Verify APK
         run: |
           echo "=============================================="
           echo "RELEASE APK"
           echo "=============================================="
 
-          find app/build/outputs -type f -name "*.apk" -print
-
           APK=$(find app/build/outputs -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: Release APK was not generated."
-            exit 1
+              echo "ERROR: APK was not generated."
+              exit 1
           fi
 
-          echo ""
-          echo "APK:"
-          echo "$APK"
-
-          echo ""
-          echo "APK size:"
+          echo "APK: $APK"
           ls -lh "$APK"
 
-      - name: Verify APK signature
-        run: |
-          APK=$(find app/build/outputs -type f -name "*.apk" | head -n 1)
+          echo ""
+          echo "=============================================="
+          echo "VERIFYING SIGNATURE"
+          echo "=============================================="
 
-          apksigner verify \
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify \
             --verbose \
             "$APK"
 
@@ -288,10 +275,11 @@ jobs:
         run: |
           APK=$(find app/build/outputs -type f -name "*.apk" | head -n 1)
 
-          cp "$APK" \
-             "$GITHUB_WORKSPACE/Tube-release.apk"
+          cp "$APK" Tube-release.apk
 
-      - name: Upload signed Release APK
+          ls -lh Tube-release.apk
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: Tube-release
