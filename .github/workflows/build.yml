@@ -54,11 +54,9 @@ jobs:
           fi
 
           echo "SDK=$SDK"
-          echo "ANDROID_HOME=${ANDROID_HOME:-}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
 
           echo ""
-          echo "Command line tools:"
+          echo "sdkmanager:"
           find "$SDK/cmdline-tools" \
             -name sdkmanager \
             -type f \
@@ -100,7 +98,7 @@ jobs:
           echo "$SDKMANAGER"
 
           echo ""
-          echo "sdkmanager permissions:"
+          echo "Permissions:"
           ls -l "$SDKMANAGER"
 
           echo ""
@@ -109,7 +107,7 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
 
           echo ""
-          echo "Installing required Android packages..."
+          echo "Installing packages..."
 
           "$SDKMANAGER" \
             "platform-tools" \
@@ -163,9 +161,8 @@ jobs:
           test -f app/src/main/java/com/tuservidor/tube/MainActivity.java
 
           echo ""
-          echo "Required files:"
           echo "OK: app/build.gradle"
-          echo "OK: app/src/main/AndroidManifest.xml"
+          echo "OK: AndroidManifest.xml"
           echo "OK: MainActivity.java"
 
 
@@ -215,7 +212,7 @@ jobs:
           }
           EOF
 
-          echo "Root build.gradle created."
+          echo "build.gradle created."
 
 
       # ============================================================
@@ -338,8 +335,6 @@ jobs:
 
           file app/src/main/res/drawable/ic_youtube.png
 
-          echo "YouTube icon generated."
-
 
       # ============================================================
       # CONFIGURE APPLICATION ICON
@@ -380,26 +375,18 @@ jobs:
           path.write_text(text)
           PY
 
-          echo "=============================================="
-          echo "APPLICATION ICON"
-          echo "=============================================="
-
           grep -n "application" \
             app/src/main/AndroidManifest.xml
 
 
       # ============================================================
-      # INSTALL GRADLE 8.9
+      # GRADLE 8.9
       # ============================================================
 
       - name: Install Gradle 8.9
         shell: bash
         run: |
           set -e
-
-          echo "=============================================="
-          echo "INSTALLING GRADLE 8.9"
-          echo "=============================================="
 
           GRADLE_VERSION="8.9"
           GRADLE_DIR="$RUNNER_TEMP/gradle"
@@ -422,7 +409,131 @@ jobs:
 
           export PATH="$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin:$PATH"
 
+          echo "=============================================="
+          echo "GRADLE VERSION"
+          echo "=============================================="
+
           gradle --version
+
+
+      # ============================================================
+      # CREATE TEMPORARY KEYSTORE
+      # ============================================================
+
+      - name: Generate release signing key
+        shell: bash
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "GENERATING RELEASE KEYSTORE"
+          echo "=============================================="
+
+          mkdir -p keystore
+
+          keytool \
+            -genkeypair \
+            -v \
+            -keystore "$PWD/keystore/tube-release.jks" \
+            -storetype PKCS12 \
+            -alias tube \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass tube_release_password \
+            -keypass tube_release_password \
+            -dname "CN=Tube, OU=Android, O=Tube, L=Argentina, ST=Tucuman, C=AR"
+
+          test -f keystore/tube-release.jks
+
+          echo ""
+          echo "Keystore created:"
+          ls -lh keystore/tube-release.jks
+
+
+      # ============================================================
+      # CONFIGURE RELEASE SIGNING
+      # ============================================================
+
+      - name: Configure release signing
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/build.gradle")
+          text = path.read_text()
+
+          # Remove any previous generated signing configuration.
+          start = text.find("    signingConfigs {")
+
+          if start != -1:
+              end = text.find(
+                  "    buildTypes {",
+                  start
+              )
+
+              if end == -1:
+                  raise SystemExit(
+                      "ERROR: Could not locate buildTypes."
+                  )
+
+              text = text[:start] + text[end:]
+
+          signing_config = """    signingConfigs {
+              release {
+                  storeFile file("${rootProject.projectDir}/keystore/tube-release.jks")
+                  storePassword "tube_release_password"
+                  keyAlias "tube"
+                  keyPassword "tube_release_password"
+              }
+          }
+
+          """
+
+          marker = "    buildTypes {"
+
+          if marker not in text:
+              raise SystemExit(
+                  "ERROR: buildTypes block not found."
+              )
+
+          text = text.replace(
+              marker,
+              signing_config + marker,
+              1
+          )
+
+          # Remove an existing generated signingConfig line.
+          text = text.replace(
+              "signingConfig signingConfigs.release",
+              ""
+          )
+
+          release_marker = "        release {"
+
+          if release_marker not in text:
+              raise SystemExit(
+                  "ERROR: release buildType not found."
+              )
+
+          text = text.replace(
+              release_marker,
+              """        release {
+              signingConfig signingConfigs.release""",
+              1
+          )
+
+          path.write_text(text)
+          PY
+
+          echo "=============================================="
+          echo "FINAL app/build.gradle"
+          echo "=============================================="
+
+          cat app/build.gradle
 
 
       # ============================================================
@@ -442,116 +553,14 @@ jobs:
             --gradle-version 8.9 \
             --distribution-type bin
 
+          test -f gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+
           echo ""
           echo "Gradle wrapper created."
 
-          ls -la gradle/wrapper
           ls -la gradlew
-
-
-      # ============================================================
-      # GENERATE RELEASE KEYSTORE
-      # ============================================================
-
-      - name: Generate release signing key
-        shell: bash
-        env:
-          KEYSTORE_PASSWORD: tube_release_password
-          KEY_PASSWORD: tube_release_password
-          KEY_ALIAS: tube
-        run: |
-          set -e
-
-          echo "=============================================="
-          echo "GENERATING RELEASE KEYSTORE"
-          echo "=============================================="
-
-          mkdir -p "$RUNNER_TEMP/keystore"
-
-          keytool \
-            -genkeypair \
-            -v \
-            -keystore "$RUNNER_TEMP/keystore/tube-release.jks" \
-            -storetype PKCS12 \
-            -alias "$KEY_ALIAS" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
-            -dname "CN=Tube, OU=Android, O=Tube, L=Argentina, ST=Tucuman, C=AR"
-
-          echo "KEYSTORE_FILE=$RUNNER_TEMP/keystore/tube-release.jks" >> "$GITHUB_ENV"
-
-          echo "Release keystore generated."
-
-
-      # ============================================================
-      # CONFIGURE RELEASE SIGNING
-      # ============================================================
-
-      - name: Configure release signing
-        shell: bash
-        run: |
-          set -e
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("app/build.gradle")
-          text = path.read_text()
-
-          if "signingConfigs" not in text:
-
-              marker = "    buildTypes {"
-
-              signing = """    signingConfigs {
-                  release {
-                      storeFile file(System.getenv("KEYSTORE_FILE"))
-                      storePassword System.getenv("KEYSTORE_PASSWORD")
-                      keyAlias System.getenv("KEY_ALIAS")
-                      keyPassword System.getenv("KEY_PASSWORD")
-                  }
-              }
-
-          """
-
-              if marker not in text:
-                  raise SystemExit(
-                      "ERROR: buildTypes block not found."
-                  )
-
-              text = text.replace(
-                  marker,
-                  signing + marker,
-                  1
-              )
-
-          if "signingConfig signingConfigs.release" not in text:
-
-              marker = "        release {"
-
-              if marker not in text:
-                  raise SystemExit(
-                      "ERROR: release buildType not found."
-                  )
-
-              text = text.replace(
-                  marker,
-                  marker + """
-                      signingConfig signingConfigs.release
-                  """,
-                  1
-              )
-
-          path.write_text(text)
-          PY
-
-          echo "=============================================="
-          echo "FINAL app/build.gradle"
-          echo "=============================================="
-
-          cat app/build.gradle
+          ls -la gradle/wrapper
 
 
       # ============================================================
@@ -564,22 +573,18 @@ jobs:
           set -e
 
           echo "=============================================="
-          echo "GRADLE VERSION"
+          echo "VERIFYING GRADLE"
           echo "=============================================="
 
           ./gradlew --version
 
 
       # ============================================================
-      # BUILD RELEASE APK
+      # BUILD RELEASE
       # ============================================================
 
       - name: Build Release APK
         shell: bash
-        env:
-          KEYSTORE_PASSWORD: tube_release_password
-          KEY_PASSWORD: tube_release_password
-          KEY_ALIAS: tube
         run: |
           set -e
 
@@ -621,7 +626,7 @@ jobs:
           echo "$APK"
 
           echo ""
-          echo "Size:"
+          echo "APK size:"
           ls -lh "$APK"
 
           echo ""
@@ -669,7 +674,7 @@ jobs:
 
 
       # ============================================================
-      # UPLOAD APK
+      # UPLOAD ARTIFACT
       # ============================================================
 
       - name: Upload Release APK
