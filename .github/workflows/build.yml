@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - "**"
+
   workflow_dispatch:
 
 jobs:
+
   build:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -46,8 +49,10 @@ jobs:
 
           if [ -n "${ANDROID_HOME:-}" ] && [ -d "$ANDROID_HOME" ]; then
               SDK="$ANDROID_HOME"
+
           elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
               SDK="$ANDROID_SDK_ROOT"
+
           else
               echo "ERROR: Android SDK not found."
               exit 1
@@ -56,7 +61,12 @@ jobs:
           echo "SDK=$SDK"
 
           echo ""
-          echo "sdkmanager:"
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+
+          echo ""
+          echo "Command line tools:"
+
           find "$SDK/cmdline-tools" \
             -name sdkmanager \
             -type f \
@@ -64,11 +74,15 @@ jobs:
 
           echo ""
           echo "Installed platforms:"
-          ls -la "$SDK/platforms" 2>/dev/null || true
+
+          ls -la "$SDK/platforms" \
+            2>/dev/null || true
 
           echo ""
           echo "Installed build tools:"
-          ls -la "$SDK/build-tools" 2>/dev/null || true
+
+          ls -la "$SDK/build-tools" \
+            2>/dev/null || true
 
 
       # ============================================================
@@ -94,20 +108,26 @@ jobs:
               exit 1
           fi
 
-          echo "Using sdkmanager:"
+          echo "=============================================="
+          echo "SDKMANAGER"
+          echo "=============================================="
+
           echo "$SDKMANAGER"
 
           echo ""
           echo "Permissions:"
+
           ls -l "$SDKMANAGER"
 
           echo ""
           echo "Accepting Android licenses..."
 
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          yes | "$SDKMANAGER" \
+            --licenses \
+            >/dev/null 2>&1 || true
 
           echo ""
-          echo "Installing packages..."
+          echo "Installing required Android packages..."
 
           "$SDKMANAGER" \
             "platform-tools" \
@@ -134,17 +154,19 @@ jobs:
           echo "=============================================="
 
           test -d "$SDK/platforms/android-35"
+
           test -d "$SDK/build-tools/35.0.0"
 
-          test -f "$SDK/build-tools/35.0.0/apksigner"
           test -f "$SDK/build-tools/35.0.0/aapt2"
+
+          test -f "$SDK/build-tools/35.0.0/apksigner"
 
           echo ""
           echo "Android SDK OK."
 
 
       # ============================================================
-      # PROJECT STRUCTURE
+      # VERIFY PROJECT
       # ============================================================
 
       - name: Verify project structure
@@ -157,12 +179,18 @@ jobs:
           echo "=============================================="
 
           test -f app/build.gradle
+
           test -f app/src/main/AndroidManifest.xml
+
           test -f app/src/main/java/com/tuservidor/tube/MainActivity.java
 
           echo ""
+          echo "Required files:"
+
           echo "OK: app/build.gradle"
-          echo "OK: AndroidManifest.xml"
+
+          echo "OK: app/src/main/AndroidManifest.xml"
+
           echo "OK: MainActivity.java"
 
 
@@ -173,6 +201,8 @@ jobs:
       - name: Create settings.gradle
         shell: bash
         run: |
+          set -e
+
           cat > settings.gradle <<'EOF'
           pluginManagement {
               repositories {
@@ -183,7 +213,9 @@ jobs:
           }
 
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositoriesMode.set(
+                  RepositoriesMode.FAIL_ON_PROJECT_REPOS
+              )
 
               repositories {
                   google()
@@ -198,6 +230,9 @@ jobs:
 
           echo "settings.gradle created."
 
+          echo ""
+          cat settings.gradle
+
 
       # ============================================================
       # ROOT BUILD.GRADLE
@@ -206,13 +241,18 @@ jobs:
       - name: Create root build.gradle
         shell: bash
         run: |
+          set -e
+
           cat > build.gradle <<'EOF'
           plugins {
               id 'com.android.application' version '8.7.3' apply false
           }
           EOF
 
-          echo "build.gradle created."
+          echo "Root build.gradle created."
+
+          echo ""
+          cat build.gradle
 
 
       # ============================================================
@@ -247,33 +287,56 @@ jobs:
           rows = []
 
           for y in range(H):
+
               row = bytearray()
 
               for x in range(W):
 
                   left = 55
                   right = 457
+
                   top = 105
                   bottom = 407
+
                   radius = 85
 
                   inside = False
 
                   if left + radius <= x <= right - radius:
-                      inside = top <= y <= bottom
+
+                      inside = (
+                          top <= y <= bottom
+                      )
 
                   elif top + radius <= y <= bottom - radius:
-                      inside = left <= x <= right
+
+                      inside = (
+                          left <= x <= right
+                      )
 
                   else:
+
                       corners = (
-                          (left + radius, top + radius),
-                          (right - radius, top + radius),
-                          (left + radius, bottom - radius),
-                          (right - radius, bottom - radius),
+                          (
+                              left + radius,
+                              top + radius
+                          ),
+                          (
+                              right - radius,
+                              top + radius
+                          ),
+                          (
+                              left + radius,
+                              bottom - radius
+                          ),
+                          (
+                              right - radius,
+                              bottom - radius
+                          )
                       )
 
                       for cx, cy in corners:
+
                           if (
                               (x - cx) ** 2
                               + (y - cy) ** 2
@@ -283,29 +346,49 @@ jobs:
                               break
 
                   if inside:
-                      r, g, b, a = 255, 0, 0, 255
+
+                      r = 255
+                      g = 0
+                      b = 0
+                      a = 255
+
                   else:
-                      r, g, b, a = 0, 0, 0, 0
+
+                      r = 0
+                      g = 0
+                      b = 0
+                      a = 0
 
                   if inside:
+
                       if (
                           215 <= x <= 330
-                          and abs(y - 256)
+                          and
+                          abs(y - 256)
                           <= min(
                               (x - 215) * 0.58,
                               (330 - x) * 0.58
                           )
                       ):
-                          r, g, b, a = 255, 255, 255, 255
 
-                  row.extend((r, g, b, a))
+                          r = 255
+                          g = 255
+                          b = 255
+                          a = 255
 
-              rows.append(b"\x00" + bytes(row))
+                  row.extend(
+                      (r, g, b, a)
+                  )
+
+              rows.append(
+                  b"\x00" + bytes(row)
+              )
 
           raw = b"".join(rows)
 
           png = (
               b"\x89PNG\r\n\x1a\n"
+
               + chunk(
                   b"IHDR",
                   struct.pack(
@@ -319,21 +402,48 @@ jobs:
                       0
                   )
               )
+
               + chunk(
                   b"IDAT",
-                  zlib.compress(raw, 9)
+                  zlib.compress(
+                      raw,
+                      9
+                  )
               )
-              + chunk(b"IEND", b"")
+
+              + chunk(
+                  b"IEND",
+                  b""
+              )
           )
 
-          with open(
-              "app/src/main/res/drawable/ic_youtube.png",
-              "wb"
-          ) as f:
+          output = (
+              "app/src/main/res/drawable/"
+              "ic_youtube.png"
+          )
+
+          with open(output, "wb") as f:
               f.write(png)
+
+          print(
+              "Generated:",
+              output
+          )
+
+          print(
+              "Bytes:",
+              len(png)
+          )
           PY
 
-          file app/src/main/res/drawable/ic_youtube.png
+          test -f \
+            app/src/main/res/drawable/ic_youtube.png
+
+          echo ""
+          echo "Icon:"
+
+          ls -lh \
+            app/src/main/res/drawable/ic_youtube.png
 
 
       # ============================================================
@@ -365,18 +475,21 @@ jobs:
           )
 
           text = text.replace(
-              '<application',
-              '''<application
+              "<application",
+              """<application
                   android:icon="@drawable/ic_youtube"
-                  android:roundIcon="@drawable/ic_youtube"''',
+                  android:roundIcon="@drawable/ic_youtube" """,
               1
           )
 
           path.write_text(text)
           PY
 
-          grep -n "application" \
-            app/src/main/AndroidManifest.xml
+          echo "=============================================="
+          echo "MANIFEST"
+          echo "=============================================="
+
+          cat app/src/main/AndroidManifest.xml
 
 
       # ============================================================
@@ -389,9 +502,14 @@ jobs:
           set -e
 
           GRADLE_VERSION="8.9"
+
           GRADLE_DIR="$RUNNER_TEMP/gradle"
 
           mkdir -p "$GRADLE_DIR"
+
+          echo "=============================================="
+          echo "DOWNLOADING GRADLE $GRADLE_VERSION"
+          echo "=============================================="
 
           curl \
             -L \
@@ -405,19 +523,20 @@ jobs:
             "$GRADLE_DIR/gradle.zip" \
             -d "$GRADLE_DIR"
 
-          echo "$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          GRADLE_BIN="$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin"
 
-          export PATH="$GRADLE_DIR/gradle-${GRADLE_VERSION}/bin:$PATH"
+          echo "$GRADLE_BIN" >> "$GITHUB_PATH"
 
-          echo "=============================================="
-          echo "GRADLE VERSION"
-          echo "=============================================="
+          export PATH="$GRADLE_BIN:$PATH"
+
+          echo ""
+          echo "Gradle version:"
 
           gradle --version
 
 
       # ============================================================
-      # CREATE TEMPORARY KEYSTORE
+      # CREATE KEYSTORE
       # ============================================================
 
       - name: Generate release signing key
@@ -434,7 +553,8 @@ jobs:
           keytool \
             -genkeypair \
             -v \
-            -keystore "$PWD/keystore/tube-release.jks" \
+            -keystore \
+              "$PWD/keystore/tube-release.jks" \
             -storetype PKCS12 \
             -alias tube \
             -keyalg RSA \
@@ -442,17 +562,21 @@ jobs:
             -validity 10000 \
             -storepass tube_release_password \
             -keypass tube_release_password \
-            -dname "CN=Tube, OU=Android, O=Tube, L=Argentina, ST=Tucuman, C=AR"
+            -dname \
+              "CN=Tube, OU=Android, O=Tube, L=Argentina, ST=Tucuman, C=AR"
 
-          test -f keystore/tube-release.jks
+          test -f \
+            keystore/tube-release.jks
 
           echo ""
           echo "Keystore created:"
-          ls -lh keystore/tube-release.jks
+
+          ls -lh \
+            keystore/tube-release.jks
 
 
       # ============================================================
-      # CONFIGURE RELEASE SIGNING
+      # CONFIGURE APP SIGNING
       # ============================================================
 
       - name: Configure release signing
@@ -463,28 +587,42 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("app/build.gradle")
+          path = Path(
+              "app/build.gradle"
+          )
+
           text = path.read_text()
 
-          # Remove any previous generated signing configuration.
-          start = text.find("    signingConfigs {")
+          # Remove old automatically generated
+          # signingConfigs block if present.
+
+          start = text.find(
+              "    signingConfigs {"
+          )
 
           if start != -1:
+
               end = text.find(
                   "    buildTypes {",
                   start
               )
 
               if end == -1:
+
                   raise SystemExit(
-                      "ERROR: Could not locate buildTypes."
+                      "ERROR: buildTypes not found."
                   )
 
-              text = text[:start] + text[end:]
+              text = (
+                  text[:start]
+                  + text[end:]
+              )
 
           signing_config = """    signingConfigs {
               release {
-                  storeFile file("${rootProject.projectDir}/keystore/tube-release.jks")
+                  storeFile file(
+                      "${rootProject.projectDir}/keystore/tube-release.jks"
+                  )
                   storePassword "tube_release_password"
                   keyAlias "tube"
                   keyPassword "tube_release_password"
@@ -496,6 +634,7 @@ jobs:
           marker = "    buildTypes {"
 
           if marker not in text:
+
               raise SystemExit(
                   "ERROR: buildTypes block not found."
               )
@@ -506,15 +645,19 @@ jobs:
               1
           )
 
-          # Remove an existing generated signingConfig line.
+          # Remove an existing signing line.
+
           text = text.replace(
               "signingConfig signingConfigs.release",
               ""
           )
 
-          release_marker = "        release {"
+          release_marker = (
+              "        release {"
+          )
 
           if release_marker not in text:
+
               raise SystemExit(
                   "ERROR: release buildType not found."
               )
@@ -522,7 +665,7 @@ jobs:
           text = text.replace(
               release_marker,
               """        release {
-              signingConfig signingConfigs.release""",
+            signingConfig signingConfigs.release""",
               1
           )
 
@@ -554,13 +697,16 @@ jobs:
             --distribution-type bin
 
           test -f gradlew
-          test -f gradle/wrapper/gradle-wrapper.jar
+
+          test -f \
+            gradle/wrapper/gradle-wrapper.jar
 
           echo ""
           echo "Gradle wrapper created."
 
-          ls -la gradlew
-          ls -la gradle/wrapper
+          ls -lh gradlew
+
+          ls -lh gradle/wrapper/
 
 
       # ============================================================
@@ -598,27 +744,40 @@ jobs:
             --stacktrace \
             --no-daemon
 
+          echo ""
+          echo "Gradle build completed."
+
 
       # ============================================================
-      # VERIFY APK
+      # INSPECT BUILD OUTPUT
       # ============================================================
 
-      - name: Verify APK
+      - name: Inspect APK
         shell: bash
         run: |
           set -e
 
+          APK="app/build/outputs/apk/release/app-release.apk"
+
           echo "=============================================="
-          echo "RELEASE APK"
+          echo "BUILD OUTPUT"
           echo "=============================================="
 
-          APK=$(find app/build/outputs \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
+          if [ ! -f "$APK" ]; then
 
-          if [ -z "$APK" ]; then
-              echo "ERROR: APK was not generated."
+              echo "ERROR:"
+              echo "Expected APK does not exist:"
+              echo "$APK"
+
+              echo ""
+              echo "Available APK files:"
+
+              find app/build/outputs \
+                -type f \
+                -name "*.apk" \
+                -print \
+                -exec ls -lh {} \;
+
               exit 1
           fi
 
@@ -626,15 +785,144 @@ jobs:
           echo "$APK"
 
           echo ""
-          echo "APK size:"
+          echo "Size:"
+
           ls -lh "$APK"
 
           echo ""
+          echo "Bytes:"
+
+          stat -c%s "$APK"
+
+          echo ""
+          echo "=============================================="
+          echo "APK FILE TYPE"
+          echo "=============================================="
+
+          file "$APK"
+
+          echo ""
+          echo "=============================================="
+          echo "APK CONTENTS"
+          echo "=============================================="
+
+          unzip -l "$APK"
+
+          echo ""
+          echo "=============================================="
+          echo "DEX FILE"
+          echo "=============================================="
+
+          unzip -l "$APK" \
+            | grep "classes.dex"
+
+          echo ""
+          echo "classes.dex detected."
+
+
+      # ============================================================
+      # VERIFY MANIFEST
+      # ============================================================
+
+      - name: Verify APK manifest
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          echo "=============================================="
+          echo "VERIFYING MANIFEST"
+          echo "=============================================="
+
+          unzip -l "$APK" \
+            | grep "AndroidManifest.xml"
+
+          echo ""
+          echo "AndroidManifest.xml detected."
+
+
+      # ============================================================
+      # VERIFY APPLICATION CODE
+      # ============================================================
+
+      - name: Verify application code
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          echo "=============================================="
+          echo "VERIFYING APPLICATION CODE"
+          echo "=============================================="
+
+          unzip -l "$APK" \
+            | grep "classes.dex"
+
+          DEX_SIZE=$(
+            unzip -l "$APK" \
+              | awk '/classes\.dex$/ {print $1}'
+          )
+
+          echo ""
+          echo "classes.dex size:"
+          echo "$DEX_SIZE bytes"
+
+          if [ -z "$DEX_SIZE" ]; then
+              echo "ERROR: classes.dex not found."
+              exit 1
+          fi
+
+          if [ "$DEX_SIZE" -le 1000 ]; then
+              echo ""
+              echo "WARNING:"
+              echo "classes.dex is unusually small."
+          fi
+
+          echo ""
+          echo "Application DEX detected."
+
+
+      # ============================================================
+      # VERIFY ICON
+      # ============================================================
+
+      - name: Verify APK icon
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          echo "=============================================="
+          echo "VERIFYING ICON"
+          echo "=============================================="
+
+          unzip -l "$APK" \
+            | grep -E \
+              "ic_youtube|resources\.arsc"
+
+          echo ""
+          echo "Icon/resources detected."
+
+
+      # ============================================================
+      # VERIFY APK SIGNATURE
+      # ============================================================
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
           echo "=============================================="
           echo "VERIFYING APK SIGNATURE"
           echo "=============================================="
-
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
 
           "$SDK/build-tools/35.0.0/apksigner" \
             verify \
@@ -654,23 +942,29 @@ jobs:
         run: |
           set -e
 
-          APK=$(find app/build/outputs \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
+          APK="app/build/outputs/apk/release/app-release.apk"
 
-          if [ -z "$APK" ]; then
-              echo "ERROR: APK not found."
+          if [ ! -f "$APK" ]; then
+              echo "ERROR: Release APK not found."
               exit 1
           fi
 
-          cp "$APK" Tube-release.apk
+          cp \
+            "$APK" \
+            Tube-release.apk
 
           echo "=============================================="
           echo "FINAL APK"
           echo "=============================================="
 
-          ls -lh Tube-release.apk
+          ls -lh \
+            Tube-release.apk
+
+          echo ""
+          echo "Final APK bytes:"
+
+          stat -c%s \
+            Tube-release.apk
 
 
       # ============================================================
@@ -679,7 +973,10 @@ jobs:
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
+
         with:
           name: Tube-release
+
           path: Tube-release.apk
+
           if-no-files-found: error
